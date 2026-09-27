@@ -84,7 +84,7 @@ internal static class PublishingConversion
 
     private static string Operation(string name, JsonNode api) => $"{name} {api["method"]!.GetValue<string>()} {api["endpoint"]?.GetValue<string>()}".TrimEnd();
 
-    private static void PruneSchemas(JsonObject document)
+    internal static void PruneSchemas(JsonObject document)
     {
         var schemas = document["components"]!["schemas"]!.AsObject();
         var keep = new HashSet<string>(StringComparer.Ordinal);

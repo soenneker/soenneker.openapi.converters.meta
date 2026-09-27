@@ -8,5 +8,9 @@ public enum MetaOpenApiProfile
     /// <summary>Facebook Page publishing, with corrected payloads, Kiota-compatible paths, and only referenced schemas.</summary>
     FacebookPublishing,
     /// <summary>Instagram publishing through Facebook Login, with container status and only referenced schemas.</summary>
-    InstagramPublishing
+    InstagramPublishing,
+    /// <summary>Every operation and model supplied in the Meta Graph API source specifications.</summary>
+    Facebook,
+    /// <summary>All Instagram source nodes and cross-platform Instagram operations, retaining their full models.</summary>
+    Instagram
 }

@@ -57,6 +57,8 @@ public sealed class MetaOpenApiConverter : IMetaOpenApiConverter
             throw new ArgumentException("ServerUrl must be an HTTPS origin without a path, credentials, query, or fragment.", nameof(options));
         if (specifications.Count == 0) throw new ArgumentException("At least one specification is required.", nameof(specifications));
         if (!Enum.IsDefined(options.Profile)) throw new ArgumentOutOfRangeException(nameof(options), "Unknown conversion profile.");
+        if (options.Profile is MetaOpenApiProfile.Facebook or MetaOpenApiProfile.Instagram)
+            return FullApiConversion.Run(specifications, options, cancellationToken);
         return options.Profile == MetaOpenApiProfile.Default
             ? new Conversion(options, cancellationToken).Run(specifications)
             : PublishingConversion.Run(specifications, options, cancellationToken);

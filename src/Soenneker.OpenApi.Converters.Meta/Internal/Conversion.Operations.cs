@@ -93,7 +93,7 @@ internal sealed partial class Conversion
         {
             ["operationId"] = OperationId(method, path),
             ["tags"] = new JsonArray(nodeName), ["parameters"] = parameters,
-            ["x-meta-operations"] = new JsonArray(new JsonObject { ["node"] = nodeName, ["name"] = Text(api, "name"),
+            ["x-meta-operations"] = new JsonArray(new JsonObject { ["node"] = nodeName, ["name"] = Text(api, "name"), ["method"] = method, ["endpoint"] = endpoint, ["basePath"] = basePath,
                 ["returnType"] = returnType, ["parameters"] = Array(api, "params").DeepClone() }),
             ["responses"] = new JsonObject
             {
