@@ -24,7 +24,7 @@ internal sealed partial class Conversion
         var parameters = new JsonArray();
         foreach (Match match in Regex.Matches(path, @"\{([^{}]+)\}"))
             if (!parameters.Any(x => Text((JsonObject)x!, "name") == match.Groups[1].Value))
-                parameters.Add(new JsonObject { ["name"] = match.Groups[1].Value, ["in"] = "path", ["required"] = true,
+                parameters.Add((System.Text.Json.Nodes.JsonNode?)new JsonObject { ["name"] = match.Groups[1].Value, ["in"] = "path", ["required"] = true,
                     ["schema"] = new JsonObject { ["type"] = "string" } });
 
         bool bodyMethod = method is "post" or "put" or "patch";
@@ -43,7 +43,7 @@ internal sealed partial class Conversion
             if (bodyMethod)
             {
                 bodyProperties[name] = schema;
-                if (isRequired) required.Add(name);
+                if (isRequired) required.Add((System.Text.Json.Nodes.JsonNode?)name);
                 file |= type == "file";
             }
             else
@@ -52,7 +52,7 @@ internal sealed partial class Conversion
                 // Meta accepts complex values as JSON in a single query value, not exploded objects.
                 if (IsComplex(schema)) parameter["content"] = new JsonObject { ["application/json"] = new JsonObject { ["schema"] = schema } };
                 else parameter["schema"] = schema;
-                parameters.Add(parameter);
+                parameters.Add((System.Text.Json.Nodes.JsonNode?)parameter);
             }
         }
         if (method == "get")
@@ -160,7 +160,7 @@ internal sealed partial class Conversion
             {
                 var copy = (JsonObject)parameter.DeepClone();
                 if (Text(copy, "in") == "query") copy["required"] = false;
-                targetParams.Add(copy);
+                targetParams.Add((System.Text.Json.Nodes.JsonNode?)copy);
             }
             else
             {
@@ -208,6 +208,6 @@ internal sealed partial class Conversion
     private static void AddQuery(JsonArray parameters, string name, JsonObject schema)
     {
         if (!parameters.Any(x => Text((JsonObject)x!, "name") == name && Text((JsonObject)x!, "in") == "query"))
-            parameters.Add(new JsonObject { ["name"] = name, ["in"] = "query", ["schema"] = schema });
+            parameters.Add((System.Text.Json.Nodes.JsonNode?)new JsonObject { ["name"] = name, ["in"] = "query", ["schema"] = schema });
     }
 }

@@ -67,8 +67,8 @@ internal static class InstagramPublishingProfile
         }
         specifications["PublishingNode"] = new JsonObject { ["fields"] = rootFields }.ToJsonString();
         specifications["IGContainer"] = """{"fields":[{"name":"id","type":"string"},{"name":"status_code","type":"string"},{"name":"status","type":"string"}],"apis":[{"name":"#get","method":"GET","return":"IGContainer","params":[]}]}""";
-        rootFields.Add(new JsonObject { ["name"] = "status_code", ["type"] = "string" });
-        rootFields.Add(new JsonObject { ["name"] = "status", ["type"] = "string" });
+        rootFields.Add((System.Text.Json.Nodes.JsonNode?)new JsonObject { ["name"] = "status_code", ["type"] = "string" });
+        rootFields.Add((System.Text.Json.Nodes.JsonNode?)new JsonObject { ["name"] = "status", ["type"] = "string" });
         specifications["PublishingNode"] = new JsonObject { ["fields"] = rootFields.DeepClone() }.ToJsonString();
         var user = JsonNode.Parse(specifications["IGUser"])!.AsObject();
         foreach (JsonObject api in user["apis"]!.AsArray().Cast<JsonObject>())

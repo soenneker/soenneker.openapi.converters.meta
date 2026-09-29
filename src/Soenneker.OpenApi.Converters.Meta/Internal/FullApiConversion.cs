@@ -42,7 +42,7 @@ internal static class FullApiConversion
                         }
                 }
                 foreach (JsonNode? api in apis)
-                    included.Add(new JsonObject { ["node"] = name, ["method"] = api!["method"]!.DeepClone(), ["endpoint"] = api["endpoint"]?.DeepClone() });
+                    included.Add((System.Text.Json.Nodes.JsonNode?)new JsonObject { ["node"] = name, ["method"] = api!["method"]!.DeepClone(), ["endpoint"] = api["endpoint"]?.DeepClone() });
             }
             if (!specifications.TryAdd(name, root.ToJsonString())) throw new FormatException($"Duplicate specification '{name}'.");
         }
