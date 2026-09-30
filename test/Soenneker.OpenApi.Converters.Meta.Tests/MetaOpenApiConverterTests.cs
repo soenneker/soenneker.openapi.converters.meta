@@ -152,7 +152,7 @@ public sealed class MetaOpenApiConverterTests
     }
 
     [Test]
-    public async Task ReadsDirectoryWritesJsonAndHonorsCancellation()
+    public async ValueTask ReadsDirectoryWritesJsonAndHonorsCancellation()
     {
         string root = Path.Combine(Path.GetTempPath(), "meta-converter-test-" + Guid.NewGuid().ToString("N"));
         string input = Path.Combine(root, "specs");
