@@ -1,63 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
-using System.Threading;
-using Soenneker.OpenApi.Converters.Meta.Models;
 
 namespace Soenneker.OpenApi.Converters.Meta.Internal;
 
-internal static class FullApiConversion
+internal static class OpenApiNormalization
 {
-    internal static MetaOpenApiConversionResult Run(IReadOnlyDictionary<string, string> input, MetaOpenApiConverterOptions options, CancellationToken token)
+    internal static void NormalizeForKiota(JsonObject document)
     {
-        var specifications = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        int sourceOperations = 0;
-        var included = new JsonArray();
-        foreach ((string key, string json) in input.OrderBy(entry => entry.Key, StringComparer.Ordinal))
-        {
-            token.ThrowIfCancellationRequested();
-            string name = Path.GetFileName(key);
-            if (name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) name = name[..^5];
-            JsonNode root = JsonNode.Parse(json)!;
-            if (root is JsonObject obj && obj["apis"] is JsonArray apis)
-            {
-                sourceOperations += apis.Count;
-                for (int i = apis.Count - 1; i >= 0; i--)
-                {
-                    JsonObject api = apis[i]!.AsObject();
-                    if (options.Profile == MetaOpenApiProfile.Instagram && !IsInstagramNode(name) && !IsInstagramOperation(name, api)) apis.RemoveAt(i);
-                }
-                foreach (JsonObject api in apis.OfType<JsonObject>())
-                {
-                    // SDK root return aliases can name missing classes; the node defines the complete root fields.
-                    if (api["method"]?.GetValue<string>() == "GET" && string.IsNullOrEmpty(api["endpoint"]?.GetValue<string>()) && api["basePath"] is null)
-                        api["return"] = name;
-                    if (api["params"] is JsonArray parameters)
-                        foreach (JsonObject parameter in parameters.OfType<JsonObject>())
-                        {
-                            if (parameter["name"]?.GetValue<string>() == "creation_id") parameter["type"] = "string";
-                            if (name == "Page" && parameter["name"]?.GetValue<string>() == "scheduled_publish_time") parameter["type"] = "unsigned int";
-                        }
-                }
-                foreach (JsonNode? api in apis)
-                    included.Add((System.Text.Json.Nodes.JsonNode?)new JsonObject { ["node"] = name, ["method"] = api!["method"]!.DeepClone(), ["endpoint"] = api["endpoint"]?.DeepClone() });
-            }
-            if (!specifications.TryAdd(name, root.ToJsonString())) throw new FormatException($"Duplicate specification '{name}'.");
-        }
-        int supplementalOperations = specifications.ContainsKey("IGContainer") ? 0 : 1;
-        // Container polling is documented but absent from the SDK node corpus.
-        if (!specifications.ContainsKey("IGContainer"))
-            specifications["IGContainer"] = """{"fields":[{"name":"id","type":"string"},{"name":"status_code","type":"string"},{"name":"status","type":"string"}],"apis":[{"method":"GET","return":"IGContainer","params":[]}]}""";
-        var effective = new MetaOpenApiConverterOptions
-        {
-            GraphApiVersion = options.GraphApiVersion, Title = options.Title, ServerUrl = options.ServerUrl,
-            ThrowOnUnknownTypes = options.ThrowOnUnknownTypes, ResponseSchemaOverrides = options.ResponseSchemaOverrides
-        };
-        if (options.NodeTypes is not null) throw new ArgumentException("Full API profiles cannot restrict NodeTypes; use the default profile for custom subsets.", nameof(options));
-        MetaOpenApiConversionResult result = new Conversion(effective, token).Run(specifications);
-        var paths = result.Document["paths"]!.AsObject();
+        // A root {id} parameter cannot be named by Kiota; retain a descriptive indexer name.
+        var paths = document["paths"]!.AsObject();
         foreach ((string path, JsonNode? item) in paths.ToArray())
         {
             if (!path.Contains("{id}", StringComparison.Ordinal)) continue;
@@ -66,25 +19,9 @@ internal static class FullApiConversion
             foreach (JsonObject operation in item!.AsObject().Select(x => x.Value).OfType<JsonObject>())
                 if (operation["parameters"] is JsonArray parameters)
                     foreach (JsonObject parameter in parameters.Cast<JsonObject>())
-                        if (parameter["in"]?.GetValue<string>() == "path" && parameter["name"]?.GetValue<string>() == "id") parameter["name"] = "node-id";
+                        if (parameter["in"]?.GetValue<string>() == "path" && parameter["name"]?.GetValue<string>() == "id")
+                            parameter["name"] = "node-id";
         }
-        int emittedOperations = paths.SelectMany(path => path.Value!.AsObject())
-            .Sum(operation => operation.Value?["x-meta-operations"]?.AsArray().Count ?? 0);
-        if (emittedOperations != included.Count + supplementalOperations)
-            throw new InvalidOperationException($"Coverage mismatch: expected {included.Count + supplementalOperations} source operations, emitted {emittedOperations}.");
-        NormalizeForKiota(result.Document);
-        if (options.Profile == MetaOpenApiProfile.Instagram) PublishingConversion.PruneSchemas(result.Document);
-        result.Document["x-meta-source"] = new JsonObject
-        {
-            ["repository"] = "https://github.com/facebook/facebook-business-sdk-codegen", ["revision"] = options.SourceRevision ?? "local",
-            ["profile"] = options.Profile.ToString(), ["sourceOperationCount"] = sourceOperations,
-            ["includedOperationCount"] = included.Count, ["supplementalOperationCount"] = supplementalOperations, ["operations"] = included
-        };
-        return result;
-    }
-
-    private static void NormalizeForKiota(JsonObject document)
-    {
         var schemas = document["components"]!["schemas"]!.AsObject();
         foreach (JsonObject path in document["paths"]!.AsObject().Select(pair => pair.Value).OfType<JsonObject>())
         foreach (var entry in path)
@@ -191,16 +128,34 @@ internal static class FullApiConversion
         if (depth == 0) result["x-meta-schema-variants"] = variants.DeepClone();
         return result;
     }
-    internal static bool IsInstagramNode(string name) => name.Contains("Instagram", StringComparison.OrdinalIgnoreCase)
-        || name.Contains("IG", StringComparison.Ordinal) || name is "UnifiedThread" or "UnifiedMessage";
-
-    private static bool IsInstagramOperation(string name, JsonObject api)
+    internal static void PruneSchemas(JsonObject document)
     {
-        string endpoint = api["endpoint"]?.GetValue<string>() ?? "";
-        return endpoint.Contains("instagram", StringComparison.OrdinalIgnoreCase)
-            || endpoint.StartsWith("ig_", StringComparison.OrdinalIgnoreCase)
-            || IsInstagramNode(api["return"]?.GetValue<string>() ?? "")
-            || (api["params"]?.ToJsonString().Contains("instagram", StringComparison.OrdinalIgnoreCase) ?? false)
-            || (name is "Page" or "User" && (endpoint.Length == 0 || endpoint is "accounts" or "conversations" or "messages" or "subscribed_apps" or "messenger_profile"));
+        var schemas = document["components"]!["schemas"]!.AsObject();
+        var keep = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Queue<string>();
+        void Visit(JsonNode? node)
+        {
+            if (node is JsonObject obj)
+            {
+                if (obj["$ref"] is JsonValue value && value.TryGetValue<string>(out string? reference) &&
+                    reference.StartsWith("#/components/schemas/", StringComparison.Ordinal))
+                {
+                    string name = reference["#/components/schemas/".Length..];
+                    if (keep.Add(name)) pending.Enqueue(name);
+                }
+                foreach (var property in obj) Visit(property.Value);
+            }
+            else if (node is JsonArray array)
+                foreach (JsonNode? item in array) Visit(item);
+        }
+        Visit(document["paths"]);
+        while (pending.TryDequeue(out string? name))
+        {
+            if (!schemas.ContainsKey(name)) throw new InvalidOperationException($"Unresolved schema reference: {name}");
+            Visit(schemas[name]);
+        }
+        foreach (string name in schemas.Select(x => x.Key).ToArray())
+            if (!keep.Contains(name)) schemas.Remove(name);
     }
+
 }
