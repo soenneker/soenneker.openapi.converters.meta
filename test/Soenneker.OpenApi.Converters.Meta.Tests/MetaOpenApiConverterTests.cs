@@ -152,21 +152,21 @@ public sealed class MetaOpenApiConverterTests
     }
 
     [Test]
-    public async ValueTask ReadsDirectoryWritesJsonAndHonorsCancellation()
+    public async ValueTask ReadsDirectoryWritesJsonAndHonorsCancellation(CancellationToken cancellationToken)
     {
         string root = Path.Combine(Path.GetTempPath(), "meta-converter-test-" + Guid.NewGuid().ToString("N"));
         string input = Path.Combine(root, "specs");
         Directory.CreateDirectory(input);
         try
         {
-            foreach ((string key, string value) in Specs()) await File.WriteAllTextAsync(Path.Combine(input, Path.GetFileNameWithoutExtension(key) + ".json"), value);
+            foreach ((string key, string value) in Specs()) await File.WriteAllTextAsync(Path.Combine(input, Path.GetFileNameWithoutExtension(key) + ".json"), value, cancellationToken: cancellationToken);
             string output = Path.Combine(root, "output", "openapi.json");
-            MetaOpenApiConversionResult result = await _converter.ConvertToFileAsync(input, output, Options);
-            Check(await File.ReadAllTextAsync(output) == result.ToJson(), "Output JSON round trip");
+            MetaOpenApiConversionResult result = await _converter.ConvertToFileAsync(input, output, Options, cancellationToken: cancellationToken);
+            Check(await File.ReadAllTextAsync(output, cancellationToken: cancellationToken) == result.ToJson(), "Output JSON round trip");
             Validate(result);
             try { await _converter.ConvertDirectoryAsync(input, Options, new CancellationToken(true)); throw new InvalidOperationException("Cancellation not honored"); }
             catch (OperationCanceledException) { }
-            try { await _converter.ConvertToFileAsync(input, Path.Combine(input, "Page.json"), Options); throw new InvalidOperationException("Unsafe overwrite allowed"); }
+            try { await _converter.ConvertToFileAsync(input, Path.Combine(input, "Page.json"), Options, cancellationToken: cancellationToken); throw new InvalidOperationException("Unsafe overwrite allowed"); }
             catch (ArgumentException) { }
         }
         finally { Directory.Delete(root, true); }
