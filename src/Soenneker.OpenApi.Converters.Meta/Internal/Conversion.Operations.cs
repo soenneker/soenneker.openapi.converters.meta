@@ -138,7 +138,7 @@ internal sealed partial class Conversion
         string name = method + "_" + Regex.Replace(path, @"[^a-zA-Z0-9]+", "_").Trim('_');
         string identity = method + " " + path;
         if (_operationIds.TryGetValue(name, out string? existing) && existing != identity)
-            name += "_" + System.Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))).ToLowerInvariant();
+            name += "_" + System.Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         _operationIds[name] = identity;
         return name;
     }
